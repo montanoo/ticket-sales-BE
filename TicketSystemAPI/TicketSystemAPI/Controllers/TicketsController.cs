@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using TicketSystemAPI.Models; // Assuming you have a Ticket model
+using TicketSystemAPI.Models;
 using TicketSystemAPI.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Sockets;
 
 namespace TicketSystemAPI.Controllers
 {
@@ -9,9 +10,9 @@ namespace TicketSystemAPI.Controllers
     [ApiController]
     public class TicketsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly TicketSystemContext _context;
 
-        public TicketsController(AppDbContext context)
+        public TicketsController(TicketSystemContext context)
         {
             _context = context;
         }
@@ -20,53 +21,110 @@ namespace TicketSystemAPI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetTickets()
         {
-            var tickets = await _context.Tickets.Select(t => new
-            {
-                t.Id,
-                t.Variant,
-                Price = Math.Round(t.Price, 2), 
-                t.MaxRides,
+            var tickets = await _context.Tickets
+            .Include(t => t.User)
+            .Include(t => t.Type)
+            .Include(t => t.Payment)
+            .Select(t => new
+             {
+                t.TicketId,
+                t.PurchaseTime,
+                t.TypeId,
+                t.ExpirationTime,
+                t.RidesTaken,
+                t.RideLimit,
+                Price = t.Price.HasValue ? Math.Round(t.Price.Value, 2) : (decimal?)null,
                 t.DiscountCode,
-                t.PurchaseDate
-            }).ToListAsync();
+                t.UserId,
+                UserEmail = t.User.Email,
+                TicketTypeName = t.Type.Name,
+                Payment = t.Payment != null ? new
+                {
+                    t.Payment.PaymentId,
+                    Amount = Math.Round(t.Payment.Amount, 2),
+                    t.Payment.Method
+                } : null
+                }).ToListAsync();
 
             return Ok(tickets);
             //return await _context.Tickets.ToListAsync();
         }
 
-        // GET: api/tickets/{id}
-        //[HttpGet("{id}")]
-        //public async Task<ActionResult<Ticket>> GetTicket(int id)
-        //{
-        //    var ticket = await _context.Tickets.FindAsync(id);
-
-        //    if (ticket == null)
-        //    {
-        //        return NotFound();
-        //    }
-
-        //    return ticket;
-        //}
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetTicketById(int id)
         {
-            var ticket = await _context.Tickets.FindAsync(id);
+            //var ticket = await _context.Tickets.FindAsync(id);
+            var ticket = await _context.Tickets
+            .Include(t => t.User)
+            .Include(t => t.Type)
+            .Include(t => t.Payment)
+            .FirstOrDefaultAsync(t => t.TicketId == id);
+
             if (ticket == null) return NotFound();
 
             var result = new
             {
-                ticket.Id,
-                ticket.Variant,
-                Price = ticket.Price.ToString("F2"), // 👈 formats to 2 decimal places
-                ticket.MaxRides,
+                ticket.TicketId,
+                ticket.PurchaseTime,
+                ticket.TypeId,
+                ticket.ExpirationTime,
+                ticket.RidesTaken,
+                ticket.RideLimit,
+                Price = ticket.Price.HasValue ? Math.Round(ticket.Price.Value, 2) : (decimal?)null,
                 ticket.DiscountCode,
-                ticket.PurchaseDate
+                ticket.UserId,
+                UserEmail = ticket.User.Email,
+                TicketTypeName = ticket.Type.Name,
+                Payment = ticket.Payment != null ? new
+                {
+                    ticket.Payment.PaymentId,
+                    Amount = Math.Round(ticket.Payment.Amount, 2),
+                    ticket.Payment.Method
+                } : null
             };
 
             return Ok(result);
             //return Ok(ticket);
         }
+
+        // GET: api/users/{userId}/tickets
+        [HttpGet("/api/users/{userId}/tickets")]
+        public async Task<ActionResult<IEnumerable<object>>> GetUserTickets(int userId)
+        {
+            var userExists = await _context.Users.AnyAsync(u => u.UserId == userId);
+            if (!userExists)
+            {
+                return NotFound("User not found.");
+            }
+
+            var tickets = await _context.Tickets
+                .Where(t => t.UserId == userId)
+                .Include(t => t.Type)
+                .Include(t => t.Payment)
+                .Select(t => new
+                {
+                    t.TicketId,
+                    t.PurchaseTime,
+                    t.ExpirationTime,
+                    t.RidesTaken,
+                    t.RideLimit,
+                    Price = t.Price.HasValue ? Math.Round(t.Price.Value, 2) : (decimal?)null,
+                    t.DiscountCode,
+                    TicketTypeName = t.Type.Name,
+                    Payment = t.Payment != null ? new
+                    {
+                        t.Payment.PaymentId,
+                        Amount = Math.Round(t.Payment.Amount, 2),
+                        t.Payment.Method
+                    } : null
+
+                })
+                .ToListAsync();
+
+            return Ok(tickets);
+        }
+
+
 
         // POST: api/tickets
         [HttpPost]
@@ -75,23 +133,36 @@ namespace TicketSystemAPI.Controllers
             _context.Tickets.Add(ticket);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetTicket", new { id = ticket.Id }, ticket);
+            return CreatedAtAction(nameof(GetTicketById), new { id = ticket.TicketId }, ticket);
         }
 
         [HttpPost("purchase")]
         public async Task<IActionResult> PurchaseTicket([FromBody] TicketPurchaseRequest request)
         {
-            decimal basePrice = request.Variant switch
+            // First check if user exists
+            var user = await _context.Users.FindAsync(request.UserId);
+            if (user == null)
             {
-                "1-day" => 19.99m,
-                "1-week" => 49.99m,
-                "1-month" => 99.99m,
-                "3-day-limited" => 29.99m,
-                _ => 0m
-            };
+                return BadRequest("User not found.");
+            }
 
-            if (basePrice == 0)
-                return BadRequest("Invalid variant.");
+            // Find ticket type
+            var ticketType = await _context.Tickettypes.FirstOrDefaultAsync(t => t.TypeId == request.TypeId);
+            if (ticketType == null)
+            {
+                return BadRequest("Ticket type not found.");
+            }
+
+            // Calculate price
+            decimal basePrice = ticketType.BasePrice ?? 0m;
+            //decimal basePrice = request.Variant switch
+            //{
+            //    "1-day" => 19.99m,
+            //    "1-week" => 49.99m,
+            //    "1-month" => 99.99m,
+            //    "3-day-limited" => 29.99m,
+            //    _ => 0m
+            //};
 
             // Handle discount codes
             if (!string.IsNullOrEmpty(request.DiscountCode))
@@ -100,19 +171,36 @@ namespace TicketSystemAPI.Controllers
                     basePrice *= 0.9m;
             }
 
+            // Create a simple Payment
+            var payment = new Payment
+            {
+                Amount = basePrice,
+                Method = "Card" 
+            };
+
+            _context.Payments.Add(payment);
+            await _context.SaveChangesAsync(); // Save so payment ID is generated
+
+            Console.WriteLine($"Payment created with ID: {payment.PaymentId}");
+            //Console.WriteLine(payment.PaymentId);
+
+            // Create ticket
             var ticket = new Ticket
             {
-                Variant = request.Variant,
-                Price = basePrice,
-                MaxRides = request.Variant.Contains("limited") ? 10 : null,
+                PurchaseTime = DateTime.Now,
+                TypeId = ticketType.TypeId,
+                ExpirationTime = DateTime.Now.AddDays(ticketType.BaseDurationDays ?? 30), // default 30 days if null
+                RideLimit = (uint?)ticketType.BaseRideLimit,
+                Price = Math.Round(basePrice, 2),
                 DiscountCode = request.DiscountCode,
-                PurchaseDate = DateTime.Now
+                UserId = request.UserId,
+                PaymentId = payment.PaymentId // Ensure the ticket links to the payment
             };
 
             _context.Tickets.Add(ticket);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetTicketById), new { id = ticket.Id }, ticket);
+            return CreatedAtAction(nameof(GetTicketById), new { id = ticket.TicketId }, ticket);
         }
 
 
@@ -120,7 +208,7 @@ namespace TicketSystemAPI.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutTicket(int id, Ticket ticket)
         {
-            if (id != ticket.Id)
+            if (id != ticket.TicketId)
             {
                 return BadRequest();
             }

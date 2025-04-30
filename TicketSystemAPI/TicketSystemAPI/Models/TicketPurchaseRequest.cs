@@ -2,7 +2,8 @@
 {
     public class TicketPurchaseRequest
     {
-        public string Variant { get; set; }
-        public string? DiscountCode { get; set; }
+        public int TypeId { get; set; }
+        public int UserId { get; set; }
+        public string? DiscountCode { get; set; } // Optional discount
     }
 }

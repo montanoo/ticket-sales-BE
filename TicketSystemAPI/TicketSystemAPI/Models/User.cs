@@ -1,0 +1,17 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace TicketSystemAPI.Models;
+
+public partial class User
+{
+    public int UserId { get; set; }
+
+    public string Email { get; set; } = null!;
+
+    public string Password { get; set; } = null!;
+
+    [JsonIgnore] // Prevent circular reference
+    public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+}
