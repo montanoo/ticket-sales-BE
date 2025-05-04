@@ -18,7 +18,7 @@ namespace TicketSystemAPI.Controllers
         }
 
         // GET: api/tickets
-        [HttpGet]
+        [HttpGet] 
         public async Task<ActionResult<IEnumerable<Ticket>>> GetTickets()
         {
             var tickets = await _context.Tickets
