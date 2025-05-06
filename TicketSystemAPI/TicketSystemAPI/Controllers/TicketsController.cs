@@ -17,8 +17,64 @@ namespace TicketSystemAPI.Controllers
             _context = context;
         }
 
+
+        // GET: api/users
+        // Register or Create account by the user through frontend
+        [HttpPost("register")]
+        public async Task<IActionResult> RegisterUser([FromBody] User newUser)
+        {
+            if (string.IsNullOrEmpty(newUser.Email) || string.IsNullOrEmpty(newUser.Password))
+                return BadRequest("Email and Password are required.");
+
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == newUser.Email);
+            if (existingUser != null)
+                return Conflict("Email is already registered.");
+
+            _context.Users.Add(newUser);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetUserById), new { id = newUser.UserId }, newUser);
+        }
+
+        [HttpGet("get-user/{id}")]
+        public async Task<IActionResult> GetUserById(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            return Ok(new { user.UserId, user.Email });
+        }
+
+        // Verify user by scanning QR code from mobile side
+        [HttpGet("verify-mobile/{userId}")]
+        public async Task<IActionResult> VerifyUser(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound("User not found.");
+
+            var activeTicket = await _context.Tickets
+                .Where(t => t.UserId == userId && t.ExpirationTime > DateTime.Now)
+                .OrderByDescending(t => t.ExpirationTime)
+                .FirstOrDefaultAsync();
+
+            if (activeTicket == null)
+                return Ok(new { Valid = false, Message = "No valid ticket." });
+
+            return Ok(new
+            {
+                Valid = true,
+                TicketId = activeTicket.TicketId,
+                Expiration = activeTicket.ExpirationTime,
+                RideLimit = activeTicket.RideLimit,
+                RidesTaken = activeTicket.RidesTaken
+            });
+        }
+
+
+
+
         // GET: api/tickets
-        [HttpGet]
+        [HttpGet("getAllTickets")]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetTickets()
         {
             var tickets = await _context.Tickets
@@ -50,7 +106,7 @@ namespace TicketSystemAPI.Controllers
             //return await _context.Tickets.ToListAsync();
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("get-ticket/{id}")]
         public async Task<IActionResult> GetTicketById(int id)
         {
             //var ticket = await _context.Tickets.FindAsync(id);
