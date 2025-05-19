@@ -41,6 +41,7 @@ android {
 
 dependencies {
     implementation("com.github.yuriy-budiyev:code-scanner:2.3.0")
+    implementation("com.android.volley:volley:1.2.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

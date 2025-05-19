@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.collection.emptyLongSet
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -20,6 +21,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.VIEW_MODEL_STORE_OWNER_KEY
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.Response
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
 import com.budiyev.android.codescanner.AutoFocusMode
 import com.budiyev.android.codescanner.CodeScanner
 import com.budiyev.android.codescanner.CodeScannerView
@@ -32,6 +39,8 @@ import kotlin.system.exitProcess
 
 class MainActivity : ComponentActivity() {
     private lateinit var scanner: CodeScanner
+
+    private var requestQueue: RequestQueue = Volley.newRequestQueue(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +84,24 @@ class MainActivity : ComponentActivity() {
         scanner.decodeCallback = DecodeCallback {
             runOnUiThread {
                 Toast.makeText(this, "Scan result: ${it.text}", Toast.LENGTH_LONG).show()
+                // Some skeleton for request; uncomment below
+                /*var request = JsonObjectRequest(
+                // Don't know how to get the server set up for checking, probably need to run unit tests with a mock server
+                Request.Method.GET, /*TODO: If you can test it, change the ellipsis to your url*/".../verify-mobile/" + it.text, null,
+                { response ->
+                    if (response.getBoolean("Valid"))
+                    {
+                        Toast.makeText(this, "Got a result", Toast.LENGTH_LONG).show()
+                    }
+                    else {
+                        Toast.makeText(this, response.getString("Message"), Toast.LENGTH_LONG)
+                            .show()
+                    }
+                },
+                {
+                    Toast.makeText(this, "Somthing went wrong", Toast.LENGTH_LONG).show()
+                })
+                requestQueue.add(request)*/
             }
         }
         scanner.errorCallback = ErrorCallback { // or ErrorCallback.SUPPRESS
