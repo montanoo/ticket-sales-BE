@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TicketSystemAPI.Data;
 
@@ -11,9 +12,11 @@ using TicketSystemAPI.Data;
 namespace TicketSystemAPI.Migrations
 {
     [DbContext(typeof(TicketSystemContext))]
-    partial class TicketSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20250519181629_AddPaymentReservation")]
+    partial class AddPaymentReservation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -204,10 +207,6 @@ namespace TicketSystemAPI.Migrations
                         .HasMaxLength(45)
                         .HasColumnType("varchar(45)")
                         .HasColumnName("email");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("longtext");
 
                     b.Property<string>("Password")
                         .IsRequired()

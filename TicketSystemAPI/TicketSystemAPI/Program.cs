@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Stripe;
-using TicketSystemAPI;
 using TicketSystemAPI.Data;
+using TicketSystemAPI.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 

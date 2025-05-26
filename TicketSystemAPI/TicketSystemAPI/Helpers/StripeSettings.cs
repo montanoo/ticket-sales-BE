@@ -1,4 +1,4 @@
-﻿namespace TicketSystemAPI
+﻿namespace TicketSystemAPI.Helpers
 {
 
     public class StripeSettings

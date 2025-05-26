@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TicketSystemAPI.Data;
 
@@ -11,9 +12,11 @@ using TicketSystemAPI.Data;
 namespace TicketSystemAPI.Migrations
 {
     [DbContext(typeof(TicketSystemContext))]
-    partial class TicketSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20250519181328_AddPaymentStatus")]
+    partial class AddPaymentStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -93,11 +96,11 @@ namespace TicketSystemAPI.Migrations
                         .HasColumnType("varchar(16)")
                         .HasColumnName("discountCode");
 
-                    b.Property<DateTime?>("ExpirationTime")
+                    b.Property<DateTime>("ExpirationTime")
                         .HasColumnType("datetime(1)")
                         .HasColumnName("expirationTime");
 
-                    b.Property<int?>("PaymentId")
+                    b.Property<int>("PaymentId")
                         .HasColumnType("int")
                         .HasColumnName("paymentId");
 
@@ -106,7 +109,7 @@ namespace TicketSystemAPI.Migrations
                         .HasColumnType("decimal(10)")
                         .HasColumnName("price");
 
-                    b.Property<DateTime?>("PurchaseTime")
+                    b.Property<DateTime>("PurchaseTime")
                         .HasColumnType("datetime(1)")
                         .HasColumnName("purchaseTime");
 
@@ -205,10 +208,6 @@ namespace TicketSystemAPI.Migrations
                         .HasColumnType("varchar(45)")
                         .HasColumnName("email");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
                     b.Property<string>("Password")
                         .IsRequired()
                         .HasMaxLength(45)
@@ -232,6 +231,8 @@ namespace TicketSystemAPI.Migrations
                     b.HasOne("TicketSystemAPI.Models.Payment", "Payment")
                         .WithMany("Tickets")
                         .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_Tickets_Payments");
 
                     b.HasOne("TicketSystemAPI.Models.Tickettype", "Type")

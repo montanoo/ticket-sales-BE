@@ -1,25 +1,32 @@
 {
   "format": 1,
   "restore": {
-    "/home/me/Desktop/ticket-sales-BE/TicketSystemAPI/TicketSystemAPI/TicketSystemAPI.csproj": {}
+    "C:\\Users\\cccsk\\Desktop\\SUT\\SEM 6\\SP\\ticket-sales-BE\\TicketSystemAPI\\TicketSystemAPI\\TicketSystemAPI.csproj": {}
   },
   "projects": {
-    "/home/me/Desktop/ticket-sales-BE/TicketSystemAPI/TicketSystemAPI/TicketSystemAPI.csproj": {
+    "C:\\Users\\cccsk\\Desktop\\SUT\\SEM 6\\SP\\ticket-sales-BE\\TicketSystemAPI\\TicketSystemAPI\\TicketSystemAPI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/me/Desktop/ticket-sales-BE/TicketSystemAPI/TicketSystemAPI/TicketSystemAPI.csproj",
+        "projectUniqueName": "C:\\Users\\cccsk\\Desktop\\SUT\\SEM 6\\SP\\ticket-sales-BE\\TicketSystemAPI\\TicketSystemAPI\\TicketSystemAPI.csproj",
         "projectName": "TicketSystemAPI",
-        "projectPath": "/home/me/Desktop/ticket-sales-BE/TicketSystemAPI/TicketSystemAPI/TicketSystemAPI.csproj",
-        "packagesPath": "/home/me/.nuget/packages/",
-        "outputPath": "/home/me/Desktop/ticket-sales-BE/TicketSystemAPI/TicketSystemAPI/obj/",
+        "projectPath": "C:\\Users\\cccsk\\Desktop\\SUT\\SEM 6\\SP\\ticket-sales-BE\\TicketSystemAPI\\TicketSystemAPI\\TicketSystemAPI.csproj",
+        "packagesPath": "C:\\Users\\cccsk\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\cccsk\\Desktop\\SUT\\SEM 6\\SP\\ticket-sales-BE\\TicketSystemAPI\\TicketSystemAPI\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "/home/me/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\cccsk\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -38,12 +45,20 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.100"
+        "SdkAnalysisLevel": "9.0.200"
       },
       "frameworks": {
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.4, )"
+            },
+            "Microsoft.AspNetCore.Identity": {
+              "target": "Package",
+              "version": "[2.3.1, )"
+            },
             "Microsoft.EntityFrameworkCore.Design": {
               "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
               "suppressParent": "All",
@@ -60,9 +75,17 @@
               "target": "Package",
               "version": "[8.0.3, )"
             },
+            "Stripe.net": {
+              "target": "Package",
+              "version": "[48.1.0, )"
+            },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[6.6.2, )"
+            },
+            "System.IdentityModel.Tokens.Jwt": {
+              "target": "Package",
+              "version": "[8.9.0, )"
             }
           },
           "imports": [
@@ -76,20 +99,6 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.15, 8.0.15]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Host.linux-x64",
-              "version": "[8.0.15, 8.0.15]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.15, 8.0.15]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -98,7 +107,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.105/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.201/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
