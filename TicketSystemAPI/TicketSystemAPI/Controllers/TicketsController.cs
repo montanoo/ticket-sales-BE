@@ -18,6 +18,26 @@ namespace TicketSystemAPI.Controllers
         }
 
 
+        [HttpPost("reserve")]
+        public async Task<IActionResult> ReserveTicket([FromBody] TicketPurchaseRequest request)
+        {
+
+            var ticket = new Ticket
+            {
+                UserId = request.UserId,
+                TypeId = request.TypeId,
+                Status = "Reserved",
+                ReservedAt = DateTime.UtcNow,
+                ExpirationTime = DateTime.UtcNow.AddMinutes(10) // Set ExpirationTime to 10 mins from now
+            };
+
+            await _context.Tickets.AddAsync(ticket);
+            await _context.SaveChangesAsync();
+
+            // Return TicketId to frontend for payment
+            return Ok(new { ticketId = ticket.TicketId });
+        }
+
         // GET: api/users
         // Register or Create account by the user through frontend
         [HttpPost("register")]
@@ -45,6 +65,27 @@ namespace TicketSystemAPI.Controllers
             return Ok(new { user.UserId, user.Email });
         }
 
+
+        // For mobile part to get the user id
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (user == null)
+                return Unauthorized("Invalid email or password");
+
+            // Simple plain-text check (will be corrected with auth later)
+            if (user.Password != request.Password)
+                return Unauthorized("Invalid email or password");
+
+            return Ok(new { user.UserId, user.Email });
+
+            // Optionally generate a JWT token here for auth
+            //return Ok(new { user.UserId, user.Email /*, token = ...*/ });
+        }
+
         // Verify user by scanning QR code from mobile side
         [HttpGet("verify-mobile/{userId}")]
         public async Task<IActionResult> VerifyUser(int userId)
@@ -53,12 +94,20 @@ namespace TicketSystemAPI.Controllers
             if (user == null) return NotFound("User not found.");
 
             var activeTicket = await _context.Tickets
-                .Where(t => t.UserId == userId && t.ExpirationTime > DateTime.Now)
+                .Where(t => t.UserId == userId)
                 .OrderByDescending(t => t.ExpirationTime)
                 .FirstOrDefaultAsync();
 
-            if (activeTicket == null)
+            if (activeTicket == null )
                 return Ok(new { Valid = false, Message = "No valid ticket." });
+
+            // Check ticket validity and update DB if it's no longer valid
+            if (!activeTicket.IsValid())
+            {
+                activeTicket.Status = "Expired";
+                await _context.SaveChangesAsync(); // Save the status change to database
+                return Ok(new { Valid = false, Message = "No valid ticket." });
+            }
 
             return Ok(new
             {
@@ -103,13 +152,11 @@ namespace TicketSystemAPI.Controllers
                 }).ToListAsync();
 
             return Ok(tickets);
-            //return await _context.Tickets.ToListAsync();
         }
 
         [HttpGet("get-ticket/{id}")]
         public async Task<IActionResult> GetTicketById(int id)
         {
-            //var ticket = await _context.Tickets.FindAsync(id);
             var ticket = await _context.Tickets
             .Include(t => t.User)
             .Include(t => t.Type)
@@ -117,6 +164,9 @@ namespace TicketSystemAPI.Controllers
             .FirstOrDefaultAsync(t => t.TicketId == id);
 
             if (ticket == null) return NotFound();
+
+            if (!ticket.IsValid())
+                return BadRequest("Ticket is no longer valid.");
 
             var result = new
             {
@@ -140,7 +190,6 @@ namespace TicketSystemAPI.Controllers
             };
 
             return Ok(result);
-            //return Ok(ticket);
         }
 
         // GET: api/users/{userId}/tickets
@@ -191,6 +240,7 @@ namespace TicketSystemAPI.Controllers
 
             return CreatedAtAction(nameof(GetTicketById), new { id = ticket.TicketId }, ticket);
         }
+
 
         [HttpPost("purchase")]
         public async Task<IActionResult> PurchaseTicket([FromBody] TicketPurchaseRequest request)
@@ -273,6 +323,29 @@ namespace TicketSystemAPI.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        [HttpPut("{ticketId}/incrementRide")]
+        public async Task<IActionResult> IncrementRide(int ticketId)
+        {
+            var ticket = await _context.Tickets.FindAsync(ticketId);
+
+            if (ticket == null)
+                return NotFound("Ticket not found");
+
+            // Check validity before increment
+            if (!ticket.IsValid())
+            {
+                ticket.Status = "Expired";
+                await _context.SaveChangesAsync(); // Save the status change to database
+                return BadRequest("Ticket is not valid (expired, unpaid, or used up).");
+            }
+
+            ticket.RidesTaken = (ticket.RidesTaken ?? 0) + 1;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(ticket);
         }
 
         // DELETE: api/tickets/{id}

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Stripe;
+using TicketSystemAPI;
 using TicketSystemAPI.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +18,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<TicketSystemContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"),
     ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -51,6 +54,14 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection("Stripe"));
+StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
+
+builder.Services.AddHostedService<TicketExpirationService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -68,3 +79,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
