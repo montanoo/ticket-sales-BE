@@ -13,61 +13,22 @@ namespace TicketSystemAPI.Controllers
     [Route("api/[controller]")]
     public class PaymentController : ControllerBase
     {
-        private readonly string webhookSecret = "whsec_b34f91f8bdca8d19eee8eeb6e2cc53b1f9624d0f447f12c0100a9dbc56e3af41"; // Set the correct webhook secret
-        private readonly TicketSystemContext _dbContext;
+        private readonly string webhookSecret = "whsec_...";    // Set your webhook secret here for stripe cli listening
+        private readonly TicketSystemContext _context;
         private readonly IEmailService _emailService;
 
-        public PaymentController(TicketSystemContext dbContext, IEmailService emailService)
+        public PaymentController(TicketSystemContext context, IEmailService emailService)
         {
-            _dbContext = dbContext;
+            _context = context;
             _emailService = emailService;
         }
 
-        [HttpPost("create-payment-intent")]
-        public async Task<IActionResult> CreatePaymentIntent(int ticketId)
-        {
-            var ticket = await _dbContext.Tickets.FindAsync(ticketId);
-
-            if (ticket == null || ticket.Status != "Reserved")
-                return BadRequest("Invalid or unreserved ticket.");
-
-            var ticketType = await _dbContext.Tickettypes.FindAsync(ticket.TypeId);
-
-            if (ticketType == null || ticketType.BasePrice == null)
-            {
-                return BadRequest("Ticket type not found or has no base price.");
-            }
-
-            var amountInGrosze = (long)(ticketType.BasePrice.Value * 100); // Convert PLN price to grosze (Stripe amount is in the smallest currency unit)
-
-
-            var options = new PaymentIntentCreateOptions
-            {
-                Amount = amountInGrosze,
-                Currency = "pln",
-                PaymentMethodTypes = new List<string> { "card" },
-                Metadata = new Dictionary<string, string>
-                {
-                    { "TicketId", ticket.TicketId.ToString() },
-                    { "UserId", ticket.UserId.ToString() }
-                }
-            };
-
-            var service = new PaymentIntentService();
-            var paymentIntent = await service.CreateAsync(options);
-
-            return Ok(new { clientSecret = paymentIntent.ClientSecret });
-        }
-
+        // Payment Intent is created in TicketsController, where this webhook will listen for payment confirmation
         [HttpPost("webhook")]
         public async Task<IActionResult> StripeWebhook()
         {
-            Console.WriteLine("Webhook triggered");
-
             var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
-
             Event stripeEvent;
-
             try
             {
                 stripeEvent = EventUtility.ConstructEvent(
@@ -82,19 +43,15 @@ namespace TicketSystemAPI.Controllers
                 return BadRequest();
             }
 
-
             // Payment success handling
             if (stripeEvent.Type == "payment_intent.succeeded")
             {
                 var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
 
-                // Log payment intent details for debugging
-                Console.WriteLine($"PaymentIntent ID: {paymentIntent.Id}, Amount: {paymentIntent.AmountReceived}");
-
                 // Check for duplicate payments
-                if (await _dbContext.Payments.AnyAsync(p => p.StripePaymentIntentId == paymentIntent.Id))
+                if (await _context.Payments.AnyAsync(p => p.StripePaymentIntentId == paymentIntent.Id))
                 {
-                    return Ok(); // Already processed
+                    return Ok();
                 }
 
                 // Use TicketId directly from metadata
@@ -105,10 +62,9 @@ namespace TicketSystemAPI.Controllers
                     return BadRequest();
                 }
 
-                var ticket = await _dbContext.Tickets
+                var ticket = await _context.Tickets
                             .Include(t => t.Type)  // Include ticket type for duration
                             .FirstOrDefaultAsync(t => t.TicketId == ticketId);
-                //var ticket = await _dbContext.Tickets.FirstOrDefaultAsync(t => t.TicketId == ticketId);
 
                 if (ticket == null)
                 {
@@ -116,7 +72,7 @@ namespace TicketSystemAPI.Controllers
                     return NotFound();
                 }
 
-                // Create a new Payment record
+                // Create payment record
                 var payment = new Payment
                 {
                     Amount = paymentIntent.AmountReceived / 100m, // cents to PLN
@@ -124,12 +80,10 @@ namespace TicketSystemAPI.Controllers
                     StripePaymentIntentId = paymentIntent.Id,
                     CreatedAt = DateTime.UtcNow
                 };
+                await _context.Payments.AddAsync(payment);
+                await _context.SaveChangesAsync();
 
-                // Update to the database
-                await _dbContext.Payments.AddAsync(payment);
-                await _dbContext.SaveChangesAsync();
-
-                // Update Ticket
+                // Update ticket
                 ticket.PaymentId = payment.PaymentId;
                 ticket.PurchaseTime = DateTime.UtcNow;
                 ticket.Status = "Paid";
@@ -141,15 +95,9 @@ namespace TicketSystemAPI.Controllers
                 }
                 else
                 {
-                    // Fallback if BaseDurationDays is not set
-                    ticket.ExpirationTime = null; // Or set some default duration; to be adjusted later
+                    ticket.ExpirationTime = null;  // Fallback if BaseDurationDays is not set
                 }
-
-                await _dbContext.SaveChangesAsync(); // Update ticket info in database
-
-                // Log a notification about the successful transaction
-                Console.WriteLine($"Ticket ID {ticket.TicketId} marked as paid with payment ID {payment.PaymentId}.");
-
+                await _context.SaveChangesAsync();
 
                 // Retrieve the user from metadata
                 if (!paymentIntent.Metadata.TryGetValue("UserId", out var userIdStr) ||
@@ -158,8 +106,9 @@ namespace TicketSystemAPI.Controllers
                     Console.WriteLine("Missing or invalid UserId in metadata.");
                     return BadRequest();
                 }
-                var user = await _dbContext.Users.FirstOrDefaultAsync(t => t.UserId == userId);
+                var user = await _context.Users.FirstOrDefaultAsync(t => t.UserId == userId);
 
+                // Send email to notify the user
                 if (user != null)
                 {
                     await _emailService.SendEmailAsync(
@@ -174,11 +123,10 @@ namespace TicketSystemAPI.Controllers
             return Ok();
         }
 
-
         [HttpGet("payment-records")]
         public async Task<IActionResult> GetPaymentRecords([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
         {
-            var query = _dbContext.Payments.AsQueryable();
+            var query = _context.Payments.AsQueryable();
 
             if (startDate.HasValue)
                 query = query.Where(p => p.CreatedAt >= startDate.Value);
@@ -196,7 +144,7 @@ namespace TicketSystemAPI.Controllers
                     p.StripePaymentIntentId,
 
                     // Get all tickets linked to this payment
-                    Tickets = _dbContext.Tickets
+                    Tickets = _context.Tickets
                         .Where(t => t.PaymentId == p.PaymentId)
                         .Select(t => new
                         {
@@ -213,13 +161,11 @@ namespace TicketSystemAPI.Controllers
             return Ok(payments);
         }
 
-
-
         [HttpGet("payment-records-specific-user")]
        // [Authorize(Roles = "Admin")] // Optional: if using auth
         public async Task<IActionResult> GetPaymentRecordsByUser([FromQuery] int? userId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
         {
-            var query = _dbContext.Payments
+            var query = _context.Payments
                 .Include(p => p.Tickets)
                 .ThenInclude(t => t.User)
                 .AsQueryable();
@@ -240,13 +186,11 @@ namespace TicketSystemAPI.Controllers
                 TicketId = p.Tickets.FirstOrDefault().TicketId,
                 User = p.Tickets.FirstOrDefault().User.Email,
             })
-            .Where(p => !userId.HasValue || _dbContext.Tickets.Any(t => t.PaymentId == p.PaymentId && t.UserId == userId.Value))
+            .Where(p => !userId.HasValue || _context.Tickets.Any(t => t.PaymentId == p.PaymentId && t.UserId == userId.Value))
             .ToListAsync();
 
             return Ok(result);
         }
-
-
 
         [HttpGet("test-email")]
         public async Task<IActionResult> SendTestEmail()
@@ -266,7 +210,5 @@ namespace TicketSystemAPI.Controllers
                 return StatusCode(500, $"Email send failed: {ex.Message}");
             }
         }
-
-
     }
 }
