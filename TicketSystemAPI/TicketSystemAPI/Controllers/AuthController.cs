@@ -6,6 +6,10 @@ using System.Security.Claims;
 using TicketSystemAPI.Data;
 using TicketSystemAPI.DTOs;
 using TicketSystemAPI.Models;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
+
 
 namespace TicketSystemAPI.Controllers
 {
@@ -50,6 +54,67 @@ namespace TicketSystemAPI.Controllers
             return Ok(new { token = jwt, userId = user.UserId, user });
         }
 
+        [HttpGet("google-login")]
+        public IActionResult GoogleLogin()
+        {
+            Console.WriteLine("==== CALLBACK HIT ====");
+            foreach (var c in Request.Cookies)
+                Console.WriteLine($"{c.Key} = {c.Value}");
+
+            var properties = new AuthenticationProperties
+            {
+                RedirectUri = Url.Action("GoogleCallback")
+            };
+            return Challenge(properties, GoogleDefaults.AuthenticationScheme);
+        }
+
+       [HttpGet("google/callback")]
+        public async Task<IActionResult> GoogleCallback()
+        {
+            Console.WriteLine("==== CALLBACK HIT ====");
+            foreach (var cookie in Request.Cookies)
+            {
+                Console.WriteLine($"{cookie.Key} = {cookie.Value}");
+            }
+
+            // attempt to authenticate with the external scheme
+            var result = await HttpContext.AuthenticateAsync();
+
+            if (!result.Succeeded)
+            {
+                Console.WriteLine("Google auth failed.");
+                return Unauthorized("Google auth failed.");
+            }
+
+            var email = result.Principal.FindFirst(ClaimTypes.Email)?.Value;
+            var name = result.Principal.FindFirst(ClaimTypes.Name)?.Value;
+            Console.WriteLine($"Email: {email}, Name: {name}");
+
+            if (email == null)
+                return Unauthorized();
+
+            var user = _context.Users.FirstOrDefault(u => u.Email == email);
+            if (user == null)
+            {
+                user = new User { Email = email, Name = name };
+                _context.Users.Add(user);
+                _context.SaveChanges();
+            }
+
+            var jwt = JwtTokenGenerator.GenerateToken(user, _configuration["Jwt:Key"]);
+            Response.Cookies.Append("auth", jwt, new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = false,
+                Expires = DateTimeOffset.UtcNow.AddHours(1)
+            });
+
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+            return Redirect("http://localhost:5173");
+        }
+
         [HttpPost("login")]
         public IActionResult Login(LoginDto dto)
         {
@@ -88,7 +153,8 @@ namespace TicketSystemAPI.Controllers
             {
                 u.UserId,
                 u.Email,
-                u.Name
+                u.Name,
+                u.Password
             })
             .FirstOrDefault();
 
@@ -102,7 +168,13 @@ namespace TicketSystemAPI.Controllers
         [HttpPost("logout")]
         public IActionResult Logout()
         {
-            Response.Cookies.Delete("auth");
+            Response.Cookies.Delete("auth", new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = false // or true if using HTTPS
+            });
+
             return Ok(new { message = "Logged out successfully" });
         }
     }
