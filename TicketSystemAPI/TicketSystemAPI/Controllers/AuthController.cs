@@ -31,7 +31,8 @@ namespace TicketSystemAPI.Controllers
             var user = new User
             {
                 Email = dto.Email,
-                Name = dto.Name
+                Name = dto.Name,
+                Role = "User"       // default role
             };
 
             var passwordHasher = new PasswordHasher<User>();
