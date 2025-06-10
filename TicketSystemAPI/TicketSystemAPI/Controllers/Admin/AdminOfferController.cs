@@ -11,9 +11,7 @@ namespace TicketSystemAPI.Controllers.Admin
 {
     [ApiController]
     [Route("api/admin/offers")]
-    [Authorize]      
-    //[Authorize(Roles = "Admin")]
-
+    [Authorize(Roles = "Admin")]
     public class AdminOfferController : ControllerBase
     {
         private readonly TicketSystemContext _context;

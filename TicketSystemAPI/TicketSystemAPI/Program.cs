@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using Stripe;
 using TicketSystemAPI.Data;
 using TicketSystemAPI.Helpers;
+using TicketSystemAPI.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,7 @@ builder.Services.AddDbContext<TicketSystemContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"),
     ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
 
+// Authorize the user - but not really necessary right now
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "TicketSystemAPI", Version = "v1" });
@@ -108,6 +110,24 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Initialize settings
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<TicketSystemContext>();
+
+    // Initialize the notification settings if it doesn't exist
+    if (!db.NotificationConfigs.Any())
+    {
+        db.NotificationConfigs.Add(new NotificationConfig
+        {
+            EmailSubjectTemplate = "Payment Confirmation - Ticket System",
+            EmailBodyTemplate = "Dear {UserName},<br>Your payment of {Amount} PLN was successful.<br>Your ticket has been confirmed.<br><br>Thank you!",
+            EnableEmailNotifications = true
+        });
+        db.SaveChanges();
+    }
+}
 
 app.Run();
 

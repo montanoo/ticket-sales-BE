@@ -2,6 +2,7 @@
 using Stripe;
 using TicketSystemAPI.Models;
 using TicketSystemAPI.Data;
+using TicketSystemAPI.Helpers;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -13,14 +14,15 @@ namespace TicketSystemAPI.Controllers
     [Route("api/[controller]")]
     public class PaymentController : ControllerBase
     {
-        private readonly string webhookSecret = "whsec_...";    // Set your webhook secret here for stripe cli listening
         private readonly TicketSystemContext _context;
         private readonly IEmailService _emailService;
+        private readonly string _webhookSecret;
 
-        public PaymentController(TicketSystemContext context, IEmailService emailService)
+        public PaymentController(TicketSystemContext context, IEmailService emailService, IConfiguration config)
         {
             _context = context;
             _emailService = emailService;
+            _webhookSecret = config["Stripe:WebhookSecret"] ?? throw new Exception("Stripe webhook secret not configured.");
         }
 
         // Payment Intent is created in TicketsController, where this webhook will listen for payment confirmation
@@ -34,7 +36,7 @@ namespace TicketSystemAPI.Controllers
                 stripeEvent = EventUtility.ConstructEvent(
                     json,
                     Request.Headers["Stripe-Signature"],
-                    webhookSecret
+                    _webhookSecret
                 );
             }
             catch (StripeException e)
@@ -86,6 +88,7 @@ namespace TicketSystemAPI.Controllers
                 // Update ticket
                 ticket.PaymentId = payment.PaymentId;
                 ticket.PurchaseTime = DateTime.UtcNow;
+                ticket.Price = payment.Amount;
                 ticket.Status = "Paid";
 
                 // Set ExpirationTime based on TicketType BaseDurationDays
@@ -111,15 +114,34 @@ namespace TicketSystemAPI.Controllers
                 // Send email to notify the user
                 if (user != null)
                 {
+                    // Get notification settings
+                    var notifConfig = await _context.NotificationConfigs.FindAsync(1);
+
+                    // Fallback if config not found or disabled
+                    if (notifConfig?.EnableEmailNotifications != true)
+                        return Ok();
+
+                    // Format subject and body using template
+                    //string subject = notifConfig.EmailSubjectTemplate.Replace("{Amount}", payment.Amount.ToString("0.00"));
+                    string subject = notifConfig.EmailSubjectTemplate;
+                    string body = notifConfig.EmailBodyTemplate
+                        .Replace("{Amount}", payment.Amount.ToString("0.00"))
+                        .Replace("{UserName}", user.Name ?? "User");
+                        //.Replace("{TicketId}", ticket.TicketId.ToString());
+
                     await _emailService.SendEmailAsync(
                         user.Email,
-                        "Payment Confirmation - Ticket System",
-                        $"Hello,<br><br>Your payment of ${(payment.Amount):0.00} was successful.<br>Your ticket is now confirmed.<br><br>Thank you."
+                        subject,
+                        body
                     );
+
+                    //await _emailService.SendEmailAsync(
+                    //    user.Email,
+                    //    "Payment Confirmation - Ticket System",
+                    //    $"Hello,<br><br>Your payment of ${(payment.Amount):0.00} was successful.<br>Your ticket is now confirmed.<br><br>Thank you."
+                    //);
                 }
-
             }
-
             return Ok();
         }
 
