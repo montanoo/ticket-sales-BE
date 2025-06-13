@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
 using TicketSystemAPI.Data;
+using TicketSystemAPI.DTO;
 using TicketSystemAPI.Models;
 
 namespace TicketSystemAPI.Controllers
@@ -170,7 +171,44 @@ namespace TicketSystemAPI.Controllers
             return CreatedAtAction(nameof(GetTicketById), new { id = ticket.TicketId }, ticket);
         }
 
-        // Reserve and create payment intent
+        // Price calculation (before checkout) - i.e. check the cart
+        [HttpPost("calculate-price")]
+        public async Task<ActionResult<PriceCalculationResponse>> CalculatePrice([FromBody] PriceCalculationRequest request)
+        {
+            var type = await _context.Tickettypes.FindAsync(request.TypeId);
+            if (type == null || type.BasePrice == null)
+                return BadRequest("Invalid ticket type");
+
+            decimal basePrice = type.BasePrice.Value;
+            decimal finalPrice = basePrice;
+            decimal? discount = null;
+            bool promoValid = false;
+
+            if (!string.IsNullOrEmpty(request.DiscountCode))
+            {
+                var promo = await _context.Promotions.FirstOrDefaultAsync(p =>
+                    p.PromoCode == request.DiscountCode &&
+                    p.StartDate <= DateTime.UtcNow &&
+                    p.EndDate >= DateTime.UtcNow);
+
+                if (promo != null)
+                {
+                    discount = basePrice * (promo.DiscountPercentage / 100m);
+                    finalPrice -= discount.Value;
+                    promoValid = true;
+                }
+            }
+
+            return Ok(new PriceCalculationResponse
+            {
+                BasePrice = basePrice,
+                FinalPrice = finalPrice,
+                DiscountApplied = discount,
+                PromoValid = promoValid
+            });
+        }
+
+        // Reserve and create payment intent (for checkout)
         [HttpPost("reserve-and-pay")]
         public async Task<IActionResult> ReserveAndCreatePaymentIntent([FromBody] TicketPurchaseRequest request)
         {
@@ -179,6 +217,7 @@ namespace TicketSystemAPI.Controllers
             {
                 UserId = request.UserId,
                 TypeId = request.TypeId,
+                DiscountCode = request.DiscountCode,
                 Status = "Reserved",
                 ReservedAt = DateTime.UtcNow,
                 ExpirationTime = DateTime.UtcNow.AddMinutes(10) // Set ExpirationTime to 10 mins from now
@@ -194,7 +233,23 @@ namespace TicketSystemAPI.Controllers
                 return BadRequest("Ticket type not found or has no base price.");
             }
 
-            var amountInGrosze = (long)(ticketType.BasePrice.Value * 100); // Convert PLN price to grosze (Stripe amount is in the smallest currency unit)
+            decimal finalPrice = ticketType.BasePrice.Value;
+
+            // Check and Apply promotion if necessary
+            if (!string.IsNullOrEmpty(request.DiscountCode))
+            {
+                var promo = await _context.Promotions.FirstOrDefaultAsync(p =>
+                        p.PromoCode == request.DiscountCode &&
+                        p.StartDate <= DateTime.UtcNow &&
+                        p.EndDate >= DateTime.UtcNow);
+
+                if (promo != null)
+                {
+                    finalPrice -= finalPrice * (promo.DiscountPercentage / 100m);
+                }
+            }
+
+            var amountInGrosze = (long)(finalPrice * 100);  // Convert PLN price to grosze (Stripe amount is in the smallest currency unit)
 
             var options = new PaymentIntentCreateOptions
             {

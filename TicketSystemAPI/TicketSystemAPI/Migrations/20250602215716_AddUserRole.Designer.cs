@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TicketSystemAPI.Data;
 
@@ -11,9 +12,11 @@ using TicketSystemAPI.Data;
 namespace TicketSystemAPI.Migrations
 {
     [DbContext(typeof(TicketSystemContext))]
-    partial class TicketSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20250602215716_AddUserRole")]
+    partial class AddUserRole
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -39,30 +42,6 @@ namespace TicketSystemAPI.Migrations
                         .HasName("PRIMARY");
 
                     b.ToTable("__efmigrationshistory", (string)null);
-                });
-
-            modelBuilder.Entity("TicketSystemAPI.Models.NotificationConfig", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("EmailBodyTemplate")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("EmailSubjectTemplate")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<bool>("EnableEmailNotifications")
-                        .HasColumnType("tinyint(1)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("NotificationConfigs");
                 });
 
             modelBuilder.Entity("TicketSystemAPI.Models.Payment", b =>
@@ -101,36 +80,6 @@ namespace TicketSystemAPI.Migrations
 
                     MySqlEntityTypeBuilderExtensions.HasCharSet(b, "utf8mb3");
                     MySqlEntityTypeBuilderExtensions.UseCollation(b, "utf8mb3_general_ci");
-                });
-
-            modelBuilder.Entity("TicketSystemAPI.Models.Promotion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<decimal>("DiscountPercentage")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("PromoCode")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Promotions");
                 });
 
             modelBuilder.Entity("TicketSystemAPI.Models.Ticket", b =>

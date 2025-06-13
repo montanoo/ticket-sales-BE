@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TicketSystemAPI.Data;
 
@@ -11,9 +12,11 @@ using TicketSystemAPI.Data;
 namespace TicketSystemAPI.Migrations
 {
     [DbContext(typeof(TicketSystemContext))]
-    partial class TicketSystemContextModelSnapshot : ModelSnapshot
+    [Migration("20250609225428_AddSettingsAndPromoModels")]
+    partial class AddSettingsAndPromoModels
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -41,6 +44,56 @@ namespace TicketSystemAPI.Migrations
                     b.ToTable("__efmigrationshistory", (string)null);
                 });
 
+            modelBuilder.Entity("TicketSystemAPI.Models.IntegrationSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("JwtSecretKey")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("SmtpFrom")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("SmtpHost")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("SmtpPassword")
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("SmtpPort")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SmtpUsername")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("StripePublishableKey")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("StripeSecretKey")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("StripeWebhookSecret")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("IntegrationSettings");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            UpdatedAt = new DateTime(2025, 6, 9, 22, 54, 28, 60, DateTimeKind.Utc).AddTicks(3483)
+                        });
+                });
+
             modelBuilder.Entity("TicketSystemAPI.Models.NotificationConfig", b =>
                 {
                     b.Property<int>("Id")
@@ -63,6 +116,15 @@ namespace TicketSystemAPI.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("NotificationConfigs");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            EmailBodyTemplate = "",
+                            EmailSubjectTemplate = "",
+                            EnableEmailNotifications = true
+                        });
                 });
 
             modelBuilder.Entity("TicketSystemAPI.Models.Payment", b =>
