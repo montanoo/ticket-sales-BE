@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
+using Stripe.Terminal;
 using TicketSystemAPI.Data;
 using TicketSystemAPI.DTO;
 using TicketSystemAPI.Models;
@@ -131,32 +132,93 @@ namespace TicketSystemAPI.Controllers
         public async Task<IActionResult> VerifyUser(int userId)
         {
             var user = await _context.Users.FindAsync(userId);
-            if (user == null) return NotFound("User not found.");
+            if (user == null)
+                return NotFound("User not found.");
 
-            var activeTicket = await _context.Tickets
-                .Where(t => t.UserId == userId)
-                .OrderByDescending(t => t.ExpirationTime)
-                .FirstOrDefaultAsync();
+            var paidTickets = await _context.Tickets
+                .Include(t => t.Type)
+                .Where(t => t.UserId == userId && t.Status == "Paid")
+                .ToListAsync();
 
-            if (activeTicket == null)
-                return Ok(new { Valid = false, Message = "No valid ticket." });
+            var validTickets = new List<object>();
+            var ticketsToUpdate = false;
 
-            // Check ticket validity and update DB if it's no longer valid
-            if (!activeTicket.IsValid())
+            foreach (var ticket in paidTickets)
             {
-                activeTicket.Status = "Expired";
-                await _context.SaveChangesAsync(); // Save the status change to database
-                return Ok(new { Valid = false, Message = "No valid ticket." });
+                if (ticket.IsValid())
+                {
+                    validTickets.Add(new
+                    {
+                        TicketId = ticket.TicketId,
+                        TicketType = ticket.Type.Name,
+                        Expiration = ticket.ExpirationTime,
+                        RideLimit = ticket.RideLimit,
+                        RidesTaken = ticket.RidesTaken
+                    });
+                }
+                else
+                {
+                    ticket.Status = "Expired";
+                    ticketsToUpdate = true;
+                }
             }
+
+            if (ticketsToUpdate)
+                await _context.SaveChangesAsync(); // Save expired statuses if any
+
+            if (validTickets.Count == 0)
+                return Ok(new { Valid = false, Message = "No valid tickets." });
 
             return Ok(new
             {
                 Valid = true,
-                TicketId = activeTicket.TicketId,
-                Expiration = activeTicket.ExpirationTime,
-                RideLimit = activeTicket.RideLimit,
-                RidesTaken = activeTicket.RidesTaken
+                Tickets = validTickets
             });
+        }
+
+        // Get entry history for a specific ticket
+        [HttpGet("{ticketId}/entries")]
+        public async Task<IActionResult> GetTicketEntryHistory(int ticketId)
+        {
+            var ticket = await _context.Tickets.FindAsync(ticketId);
+            if (ticket == null)
+                return NotFound("Ticket not found");
+
+            var entries = await _context.TicketEntryHistories
+                .Where(e => e.TicketId == ticketId)
+                .OrderByDescending(e => e.ScannedAt)
+                .Select(e => new
+                {
+                    e.ScannedAt
+                })
+                .ToListAsync();
+
+            return Ok(entries);
+        }
+
+        // Get all entry history for a specific user
+        [HttpGet("user/{userId}/entries")]
+        public async Task<IActionResult> GetUserEntryHistory(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return NotFound("User not found");
+
+            var entries = await _context.TicketEntryHistories
+                .Include(e => e.Ticket)
+                    .ThenInclude(t => t.Type)
+                .Where(e => e.Ticket.UserId == userId)
+                .OrderByDescending(e => e.ScannedAt)
+                .Select(e => new
+                {
+                    TicketId = e.TicketId,
+                    TicketType = e.Ticket.Type.Name,
+                    RidesTaken = e.Ticket.RidesTaken,
+                    e.ScannedAt
+                })
+                .ToListAsync();
+
+            return Ok(entries);
         }
 
 
@@ -305,6 +367,14 @@ namespace TicketSystemAPI.Controllers
             }
 
             ticket.RidesTaken = (ticket.RidesTaken ?? 0) + 1;
+
+            // Log to entry history
+            var entry = new TicketEntryHistory
+            {
+                TicketId = ticketId,
+                ScannedAt = DateTime.UtcNow
+            };
+            _context.TicketEntryHistories.Add(entry);
 
             await _context.SaveChangesAsync();
 

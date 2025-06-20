@@ -31,6 +31,8 @@ public partial class TicketSystemContext : DbContext
     public virtual DbSet<Promotion> Promotions { get; set; }
     public virtual DbSet<NotificationConfig> NotificationConfigs { get; set; }
 
+    public virtual DbSet<TicketEntryHistory> TicketEntryHistories { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseMySql("server=localhost;database=ticketsystem;user=root;password=root", ServerVersion.Parse("8.0.41-mysql"));
@@ -163,6 +165,32 @@ public partial class TicketSystemContext : DbContext
                 .HasMaxLength(45)
                 .HasColumnName("password");
         });
+
+        modelBuilder.Entity<TicketEntryHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("ticket_entry_history")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => e.TicketId, "fk_TicketEntryHistory_Tickets");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+
+            entity.Property(e => e.TicketId).HasColumnName("ticketId");
+
+            entity.Property(e => e.ScannedAt)
+                .HasColumnType("datetime(1)")
+                .HasColumnName("scannedAt");
+
+            entity.HasOne(e => e.Ticket)
+                .WithMany(t => t.EntryHistory)
+                .HasForeignKey(e => e.TicketId)
+                .HasConstraintName("fk_TicketEntryHistory_Tickets");
+        });
+
 
         OnModelCreatingPartial(modelBuilder);
     }

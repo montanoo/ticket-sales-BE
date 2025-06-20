@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace TicketSystemAPI.Models;
 
@@ -34,6 +35,10 @@ public partial class Ticket
     public virtual Tickettype Type { get; set; } = null!;
 
     public virtual User User { get; set; } = null!;
+
+    [JsonIgnore] // Prevent circular reference
+    public virtual ICollection<TicketEntryHistory> EntryHistory { get; set; } = new List<TicketEntryHistory>();
+
 
     public bool IsValid()
     {
