@@ -26,6 +26,7 @@ import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import com.budiyev.android.codescanner.AutoFocusMode
 import com.budiyev.android.codescanner.CodeScanner
@@ -40,11 +41,13 @@ import kotlin.system.exitProcess
 class MainActivity : ComponentActivity() {
     private lateinit var scanner: CodeScanner
 
-    private var requestQueue: RequestQueue = Volley.newRequestQueue(this)
+    private var requestQueue: RequestQueue? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        requestQueue = Volley.newRequestQueue(this)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
         {
@@ -84,24 +87,32 @@ class MainActivity : ComponentActivity() {
         scanner.decodeCallback = DecodeCallback {
             runOnUiThread {
                 Toast.makeText(this, "Scan result: ${it.text}", Toast.LENGTH_LONG).show()
-                // Some skeleton for request; uncomment below
-                /*var request = JsonObjectRequest(
-                // Don't know how to get the server set up for checking, probably need to run unit tests with a mock server
-                Request.Method.GET, /*TODO: If you can test it, change the ellipsis to your url*/".../verify-mobile/" + it.text, null,
+                val request = JsonObjectRequest(
+                    // NOTE: to get this to work, run your server with --urls="your_local_ip:port" param and change this to that ip and port
+                Request.Method.GET, "http://192.168.1.19:5168/api/tickets/verify-mobile/" + it.text, null,
                 { response ->
-                    if (response.getBoolean("Valid"))
+                    if (response.getBoolean("valid"))
                     {
-                        Toast.makeText(this, "Got a result", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Found a valid ticket. Valid until: " + response.getString("expiration"), Toast.LENGTH_LONG).show()
+                        val request2 = StringRequest(Request.Method.PUT, "http://192.168.1.19:5168/api/tickets/" + response.getInt("ticketId").toString() + "/incrementRide",
+                            {
+                                Toast.makeText(this, "Ticket registered.", Toast.LENGTH_LONG).show()
+                            },
+                            { error ->
+                                Toast.makeText(this, "Failed to register: " + error.message, Toast.LENGTH_LONG).show()
+                            })
+                        requestQueue?.add(request2)
                     }
                     else {
-                        Toast.makeText(this, response.getString("Message"), Toast.LENGTH_LONG)
+                        Toast.makeText(this, "Could not find a valid ticket. Message from the server: " + response.getString("message"), Toast.LENGTH_LONG)
                             .show()
                     }
                 },
                 {
-                    Toast.makeText(this, "Somthing went wrong", Toast.LENGTH_LONG).show()
+                    error ->
+                    Toast.makeText(this, "Something went wrong: " + error.message, Toast.LENGTH_LONG).show()
                 })
-                requestQueue.add(request)*/
+                requestQueue?.add(request)
             }
         }
         scanner.errorCallback = ErrorCallback { // or ErrorCallback.SUPPRESS
