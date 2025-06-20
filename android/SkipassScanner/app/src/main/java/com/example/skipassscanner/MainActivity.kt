@@ -94,6 +94,14 @@ class MainActivity : ComponentActivity() {
                     if (response.getBoolean("valid"))
                     {
                         Toast.makeText(this, "Found a valid ticket. Valid until: " + response.getString("expiration"), Toast.LENGTH_LONG).show()
+                        val request2 = StringRequest(Request.Method.PUT, "http://192.168.1.19:5168/api/tickets/" + response.getInt("ticketId").toString() + "/incrementRide",
+                            {
+                                Toast.makeText(this, "Ticket registered.", Toast.LENGTH_LONG).show()
+                            },
+                            { error ->
+                                Toast.makeText(this, "Failed to register: " + error.message, Toast.LENGTH_LONG).show()
+                            })
+                        requestQueue?.add(request2)
                     }
                     else {
                         Toast.makeText(this, "Could not find a valid ticket. Message from the server: " + response.getString("message"), Toast.LENGTH_LONG)
