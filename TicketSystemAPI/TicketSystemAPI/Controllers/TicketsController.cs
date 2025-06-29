@@ -140,21 +140,17 @@ namespace TicketSystemAPI.Controllers
                 .Where(t => t.UserId == userId && t.Status == "Paid")
                 .ToListAsync();
 
-            var validTickets = new List<object>();
-            var ticketsToUpdate = false;
+            Ticket validTicket = null;
+            bool ticketsToUpdate = false;
 
             foreach (var ticket in paidTickets)
             {
                 if (ticket.IsValid())
                 {
-                    validTickets.Add(new
+                    if (validTicket == null || ticket.ExpirationTime < validTicket.ExpirationTime)
                     {
-                        TicketId = ticket.TicketId,
-                        TicketType = ticket.Type.Name,
-                        Expiration = ticket.ExpirationTime,
-                        RideLimit = ticket.RideLimit,
-                        RidesTaken = ticket.RidesTaken
-                    });
+                        validTicket = ticket; // Pick the soonest expiring valid ticket
+                    }
                 }
                 else
                 {
@@ -164,16 +160,25 @@ namespace TicketSystemAPI.Controllers
             }
 
             if (ticketsToUpdate)
-                await _context.SaveChangesAsync(); // Save expired statuses if any
+                await _context.SaveChangesAsync();
 
-            if (validTickets.Count == 0)
-                return Ok(new { Valid = false, Message = "No valid tickets." });
+            if (validTicket == null)
+                return Ok(new { valid = false, message = "No valid tickets." });
 
             return Ok(new
             {
-                Valid = true,
-                Tickets = validTickets
+                valid = true,
+                ticketId = validTicket.TicketId,
+                expiration = validTicket.ExpirationTime,
+                rideLimit = validTicket.RideLimit,
+                ridesTaken = validTicket.RidesTaken,
+                ticketType = validTicket.Type.Name
             });
+            //    return Ok(new
+            //    {
+            //        Valid = true,
+            //        Tickets = validTickets
+            //    });
         }
 
         // Get entry history for a specific ticket
