@@ -88,7 +88,7 @@ fun LoginForm(c: Context, rq: RequestQueue?)
                             "Got a response: userId = " + response.getInt("userId"),
                             Toast.LENGTH_LONG
                         ).show()
-                        val i: Intent = Intent()
+                        val i = Intent()
                         i.putExtra("userId", response.getInt("userId"))
                         getActivity(c)?.setResult(Activity.RESULT_OK, i)
                         getActivity(c)?.finish()

@@ -36,7 +36,11 @@ import com.budiyev.android.codescanner.ErrorCallback
 import com.budiyev.android.codescanner.ScanMode
 import com.example.skipassscanner.ui.theme.SkipassScannerTheme
 import com.google.zxing.BarcodeFormat
+import org.json.JSONObject
 import kotlin.system.exitProcess
+
+// NOTE: to get this to work, run your server with --urls="your_local_ip:port" param and change this to that ip and port
+const val ip: String = "192.168.1.19:5168"
 
 class MainActivity : ComponentActivity() {
     private lateinit var scanner: CodeScanner
@@ -88,13 +92,20 @@ class MainActivity : ComponentActivity() {
             runOnUiThread {
                 Toast.makeText(this, "Scan result: ${it.text}", Toast.LENGTH_LONG).show()
                 val request = JsonObjectRequest(
-                    // NOTE: to get this to work, run your server with --urls="your_local_ip:port" param and change this to that ip and port
-                Request.Method.GET, "http://192.168.1.19:5168/api/tickets/verify-mobile/" + it.text, null,
+                Request.Method.GET, "http://$ip/api/tickets/verify-mobile/" + it.text, null,
                 { response ->
                     if (response.getBoolean("valid"))
                     {
-                        Toast.makeText(this, "Found a valid ticket. Valid until: " + response.getString("expiration"), Toast.LENGTH_LONG).show()
-                        val request2 = StringRequest(Request.Method.PUT, "http://192.168.1.19:5168/api/tickets/" + response.getInt("ticketId").toString() + "/incrementRide",
+                        var text = ""
+                        if(!response.isNull("expiration")) {
+                            text += " expires: " + response.getString("expiration")
+                        }
+                        if(!response.isNull("rideLimit"))
+                        {
+                            text += " (rides left: ${(response.getInt("rideLimit") - response.getInt("ridesTaken"))})"
+                        }
+                        Toast.makeText(this, "Found a valid ticket.$text", Toast.LENGTH_LONG).show()
+                        val request2 = StringRequest(Request.Method.PUT, "http://$ip/api/tickets/${response.getInt("ticketId")}/incrementRide",
                             {
                                 Toast.makeText(this, "Ticket registered.", Toast.LENGTH_LONG).show()
                             },

@@ -1,5 +1,6 @@
 package com.example.skipasstickets
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -16,12 +17,16 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.skipasstickets.ui.theme.SkipassTicketsTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat.startActivity
 import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import org.json.JSONObject
 
 
 class MainActivity : ComponentActivity() {
@@ -40,16 +45,20 @@ class MainActivity : ComponentActivity() {
                 { response ->
                     if (response.getBoolean("valid"))
                     {
-                        var text = "You have a valid ticket: expires " + response.getString("expiration")
+                        var text = "You have a valid ticket."
+                        if(!response.isNull("expiration")) {
+                            text += " expires: " + response.getString("expiration")
+                        }
                         if(!response.isNull("rideLimit"))
                         {
-                            text += " (rides left: " + (response.getInt("rideLimit") - response.getInt("ridesTaken")) + ")"
+                            text += " (rides left: ${(response.getInt("rideLimit") - response.getInt("ridesTaken"))})"
                         }
 
                         setContent {
                             Column {
                                 Text(text = text)
                                 QRCode(qrEncoder.getBitmap(0).asImageBitmap())
+                                EntriesButton(LocalContext.current, userId?:-1)
                             }
                         }
                     }
@@ -58,6 +67,7 @@ class MainActivity : ComponentActivity() {
                             Column {
                                 Text(text = "No valid ticket available for this account")
                                 QRCode(qrEncoder.getBitmap(0).asImageBitmap())
+                                EntriesButton(LocalContext.current, userId?:-1)
                             }
                         }
                     }
@@ -82,10 +92,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         requestQueue = Volley.newRequestQueue(this)
-        val i: Intent = Intent(applicationContext, LoginActivity::class.java)
+        val i = Intent(applicationContext, LoginActivity::class.java)
         launcher.launch(i)
 
-        var qrEncoder: QRGEncoder = QRGEncoder("there is an error in the QR code generator.", QRGContents.Type.TEXT, 500)
+        var qrEncoder: QRGEncoder = QRGEncoder("Not initialized", QRGContents.Type.TEXT, 500)
 
         enableEdgeToEdge()
         setContent {
@@ -114,9 +124,17 @@ fun QRCode(bitmap: ImageBitmap)
 }
 
 @Composable
-fun ValidTicket()
+fun EntriesButton(c: Context, userId: Int)
 {
-
+    Button(
+        onClick = {
+            val i = Intent(c, EntriesActivity::class.java)
+            i.putExtra("userId", userId)
+            c.startActivity(i)
+        }
+    ) {
+        Text("See entries")
+    }
 }
 
 /*@Composable
