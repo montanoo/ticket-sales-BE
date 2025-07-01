@@ -279,12 +279,20 @@ namespace TicketSystemAPI.Controllers
         [HttpPost("reserve-and-pay")]
         public async Task<IActionResult> ReserveAndCreatePaymentIntent([FromBody] TicketPurchaseRequest request)
         {
+            var ticketType = await _context.Tickettypes.FindAsync(request.TypeId);
+
+            if (ticketType == null || ticketType.BasePrice == null)
+            {
+                return BadRequest("Ticket type not found or has no base price.");
+            }
 
             var ticket = new Ticket
             {
                 UserId = request.UserId,
                 TypeId = request.TypeId,
                 DiscountCode = request.DiscountCode,
+                RideLimit = (uint?)ticketType.BaseRideLimit,
+                RidesTaken = 0,
                 Status = "Reserved",
                 ReservedAt = DateTime.UtcNow,
                 ExpirationTime = DateTime.UtcNow.AddMinutes(10) // Set ExpirationTime to 10 mins from now
@@ -292,13 +300,6 @@ namespace TicketSystemAPI.Controllers
 
             await _context.Tickets.AddAsync(ticket);
             await _context.SaveChangesAsync();
-
-            var ticketType = await _context.Tickettypes.FindAsync(ticket.TypeId);
-
-            if (ticketType == null || ticketType.BasePrice == null)
-            {
-                return BadRequest("Ticket type not found or has no base price.");
-            }
 
             decimal finalPrice = ticketType.BasePrice.Value;
 
